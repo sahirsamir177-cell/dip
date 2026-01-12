@@ -1,0 +1,44 @@
+name: Free RDP (Asrar Tech Method)
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Install Tailscale
+      run: |
+        $exe = "C:\Program Files\Tailscale\tailscale.exe"
+        if (-not (Test-Path $exe)) {
+            $url = 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe'
+            $dst = "$env:TEMP\tailscale-setup.exe"
+            Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
+            Start-Process -FilePath $dst -ArgumentList "/quiet" -Wait
+        }
+        Start-Service Tailscale -ErrorAction SilentlyContinue
+        & "$exe" version
+
+    - name: Create RDP User & Password
+      run: |
+        $username = "runneradmin"
+        $password = "AsrarTech123@"
+        net user $username $password /add
+        net localgroup "Administrators" $username /add
+        net localgroup "Remote Desktop Users" $username /add
+        Write-Host "========================================"
+        Write-Host "User Name: $username"
+        Write-Host "Password: $password"
+        Write-Host "========================================"
+
+    - name: Enable RDP & Firewall
+      run: |
+        Set-ItemProperty "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name fDenyTSConnections -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" | Out-Null
+
+    - name: Keep Alive
+      run: |
+        Write-Host "RDP is Running... Connect via Tailscale IP"
+        while ($true) { Start-Sleep -Seconds 60 }
