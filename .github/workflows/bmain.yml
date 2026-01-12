@@ -1,0 +1,30 @@
+name: Free RDP (Asrar Tech Method)
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Download Tailscale
+      uses: tailscale/github-action@v2
+      with:
+        authkey: ${{ secrets.TS_KEY }}
+        version: 1.42.0
+
+    - name: Create User & Password
+      run: |
+        $password = "AsrarTech123@"
+        net user runneradmin $password
+        Write-Host "========================================"
+        Write-Host "User Name: runneradmin"
+        Write-Host "Password: $password"
+        Write-Host "========================================"
+
+    - name: Keep Alive
+      run: |
+        Write-Host "RDP is Running... Connect via Tailscale IP"
+        while ($true) { Start-Sleep -Seconds 60 }
