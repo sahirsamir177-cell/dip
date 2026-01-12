@@ -1,0 +1,72 @@
+name: Windows RDP via Custom VPN
+
+on:
+  workflow_dispatch:
+    inputs:
+      vpn_config:
+        description: "Path or URL to your VPN config"
+        required: true
+      rdp_user:
+        description: "RDP Username"
+        required: false
+        default: "runneradmin"
+      rdp_pass:
+        description: "RDP Password"
+        required: false
+        default: "CustomRDP123@"
+      runtime_minutes:
+        description: "Runtime in minutes"
+        required: false
+        default: "60"
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Enable RDP and Firewall
+      run: |
+        $u="${{ github.event.inputs.rdp_user }}"
+        $p="${{ github.event.inputs.rdp_pass }}"
+        $sec = ConvertTo-SecureString $p -AsPlainText -Force
+
+        if (-not (Get-LocalUser -Name $u -ErrorAction SilentlyContinue)) {
+          New-LocalUser -Name $u -Password $sec -AccountNeverExpires
+          Add-LocalGroupMember -Group Administrators -Member $u
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $u
+        } else {
+          Set-LocalUser -Name $u -Password $sec -AccountNeverExpires
+          Enable-LocalUser -Name $u
+        }
+
+        Set-ItemProperty "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name fDenyTSConnections -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" | Out-Null
+
+    - name: Connect to Custom VPN
+      run: |
+        # مثال: فتح VPN عبر ملف config أو برنامج CLI
+        $vpn = "${{ github.event.inputs.vpn_config }}"
+        Write-Host "Connecting to VPN using config: $vpn"
+        # ضع هنا أمر الاتصال بالـ VPN، مثال:
+        # & "C:\Path\To\VPNClient.exe" -connect $vpn
+
+        Start-Sleep -Seconds 10
+        Write-Host "VPN Connected"
+
+    - name: Get VPN IP
+      id: get_ip
+      run: |
+        $ip4 = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like "*VPN*" }).IPAddress
+        Write-Host "vpn_ip=$ip4" | Out-File -Append $env:GITHUB_OUTPUT
+        Write-Host "Connect via IP: $ip4"
+
+    - name: Keep RDP Alive
+      run: |
+        $mins=[int]"${{ github.event.inputs.runtime_minutes }}"
+        $end=(Get-Date).AddMinutes($mins)
+        while((Get-Date) -lt $end){
+          $left=[int]([math]::Ceiling(($end-(Get-Date)).TotalMinutes))
+          Write-Host "RDP is running via VPN... ($left min left)"
+          Start-Sleep -Seconds 60
+        }
